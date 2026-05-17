@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiles Survive — Team Builder</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel (JSX in browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #030712; }
+    input[type=range] { cursor: pointer; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #111827; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // ═══════════════════════════════════════════════════
+    // HEROES DATABASE
+    // ═══════════════════════════════════════════════════
+
+    const HEROES = [
+      // ── SSR (Легендарные) ──
+      { id: "nikola",  name: "Nikola",  rarity: "SSR", cls: "Guardian", tier: "S", emoji: "🛡️",  role: "Фронтлайн-танк, генерирует многослойные щиты, не умирает" },
+      { id: "rosie",   name: "Rosie",   rarity: "SSR", cls: "Guardian", tier: "S", emoji: "⚔️",  role: "АоЕ ДД + самолечение, последний выживший в затяжных боях" },
+      { id: "tarzan",  name: "Tarzan",  rarity: "SSR", cls: "Guardian", tier: "S", emoji: "🌿",  role: "Бэклайн-АоЕ, баф ATK+DEF всей команды, хрупкий" },
+      { id: "layla",   name: "Layla",   rarity: "SSR", cls: "Gunner",   tier: "S", emoji: "💊",  role: "Хилер-танк: +26% HP на ур.30, лучший на фронтлайне" },
+      { id: "tara",    name: "Tara",    rarity: "SSR", cls: "Guardian", tier: "S", emoji: "🔰",  role: "Поддержка: глобальный +DEF% всей команде, шкалируется с её DEF" },
+      { id: "ray",     name: "Ray",     rarity: "SSR", cls: "Guardian", tier: "A", emoji: "🏋️",  role: "Стабильный фронтлайн, высокие базовые, нет гиммиков" },
+      { id: "becka",   name: "Becka",   rarity: "SSR", cls: "Gunner",   tier: "A", emoji: "🔫",  role: "Прямолинейный АоЕ-ДД сквозь ряды, казнит цели до 30% HP" },
+      { id: "maddie",  name: "Maddie",  rarity: "SSR", cls: "Marksman", tier: "A", emoji: "🏹",  role: "Универсал: ДД + лечение, гибкий без нужды в поддержке" },
+      { id: "candy",   name: "Candy",   rarity: "SSR", cls: "Support",  tier: "A", emoji: "🍬",  role: "Лечение + крит-усиление для героя с наивысшим ATK" },
+      { id: "chiron",  name: "Chiron",  rarity: "SSR", cls: "Marksman", tier: "A", emoji: "🎯",  role: "Снижение DEF врага → петля крит-урона для команды" },
+      { id: "tony",    name: "Tony",    rarity: "SSR", cls: "Gunner",   tier: "A", emoji: "🎭",  role: "Combo-энейблер: Pulse Mark усиливает следующий скилл команды" },
+      { id: "kiki",    name: "Kiki",    rarity: "SSR", cls: "Gunner",   tier: "A", emoji: "💫",  role: "Beam Burst — волновая атака, лучшая волновая зачистка" },
+      { id: "titi",    name: "Titi",    rarity: "SSR", cls: "Support",  tier: "B", emoji: "🌟",  role: "Командная поддержка" },
+      { id: "wright",  name: "Wright",  rarity: "SSR", cls: "Guardian", tier: "B", emoji: "🧱",  role: "Защитник с устойчивыми статами" },
+      { id: "jacob",   name: "Jacob",   rarity: "SSR", cls: "Guardian", tier: "B", emoji: "⚙️",  role: "Фронтлайн-воин" },
+      { id: "tesla",   name: "Tesla",   rarity: "SSR", cls: "Gunner",   tier: "B", emoji: "⚡",  role: "Электро дистанционный ДД" },
+      // ── SR (Эпические) ──
+      { id: "freja",   name: "Freja",   rarity: "SR",  cls: "Guardian", tier: "S", emoji: "🗡️",  role: "Лучший SR: двойные удары + АоЕ, не требует поддержки" },
+      { id: "eva",     name: "Eva",     rarity: "SR",  cls: "Support",  tier: "B", emoji: "🍃",  role: "Сбор ресурсов, средние боевые статы" },
+      { id: "lucky",   name: "Lucky",   rarity: "SR",  cls: "Support",  tier: "B", emoji: "🍀",  role: "Снижение выносливости — лучший пассив в игре" },
+      { id: "travis",  name: "Travis",  rarity: "SR",  cls: "Marksman", tier: "B", emoji: "🎪",  role: "Гибкий ДД, бьёт выше своего класса при удачных условиях" },
+      { id: "sarge",   name: "Sarge",   rarity: "SR",  cls: "Gunner",   tier: "C", emoji: "🪖",  role: "Обучающий герой, ранний ДД, быстро устаревает" },
+      { id: "chef",    name: "Chef",    rarity: "SR",  cls: "Support",  tier: "C", emoji: "🍳",  role: "Раннее лечение + прокачка производства, не для ПвП" },
+      // ── R (Обычные) ──
+      { id: "ghost",   name: "Ghost",   rarity: "R",   cls: "Guardian", tier: "C", emoji: "👻",  role: "Бюджетный танк, заглушка до появления SSR" },
+      { id: "rusty",   name: "Rusty",   rarity: "R",   cls: "Guardian", tier: "D", emoji: "🔧",  role: "Слабый, минимальный выхлоп, замени при первой возможности" },
+    ];
+
+    const RARITY = {
+      SSR: { label: "SSR", color: "#f59e0b", bg: "#78350f20", base: 5000 },
+      SR:  { label: "SR",  color: "#a78bfa", bg: "#4c1d9520", base: 2000 },
+      R:   { label: "R",   color: "#6b7280", bg: "#1f293720", base: 600  },
+    };
+
+    const CLASS = {
+      Guardian: { label: "Гвардеец",  color: "#60a5fa", icon: "🛡️" },
+      Gunner:   { label: "Стрелок",   color: "#f97316", icon: "🔫" },
+      Marksman: { label: "Снайпер",   color: "#34d399", icon: "🏹" },
+      Support:  { label: "Поддержка", color: "#f472b6", icon: "💊" },
+    };
+
+    const TIER = {
+      S: { mult: 1.30, color: "#fbbf24" },
+      A: { mult: 1.15, color: "#34d399" },
+      B: { mult: 1.00, color: "#60a5fa" },
+      C: { mult: 0.85, color: "#9ca3af" },
+      D: { mult: 0.70, color: "#6b7280" },
+    };
+
+    const GEAR_QUALITY = [
+      { id: "none",   label: "Нет",      color: "#374151", power: 0    },
+      { id: "white",  label: "Белое",    color: "#9ca3af", power: 80   },
+      { id: "green",  label: "Зелёное",  color: "#34d399", power: 220  },
+      { id: "blue",   label: "Синее",    color: "#60a5fa", power: 480  },
+      { id: "purple", label: "Фиолет.",  color: "#a78bfa", power: 950  },
+      { id: "orange", label: "Золотое",  color: "#f59e0b", power: 1800 },
+    ];
+
+    const GEAR_SLOTS = [
+      { id: "helmet", label: "Шлем",   emoji: "⛑️", hint: "ATK" },
+      { id: "vest",   label: "Жилет",  emoji: "🦺", hint: "DEF" },
+      { id: "boots",  label: "Сапоги", emoji: "👢", hint: "SPD" },
+    ];
+
+    const SKILL_LABELS = ["Активный", "Пассив 1", "Пассив 2", "Пассив 3"];
+    const CLASS_SYNERGY = { 2: "+4% HP", 3: "+10% HP", 4: "+15% HP", 5: "+20% HP" };
+
+    // ═══════════════════════════════════════════════════
+    // LOGIC
+    // ═══════════════════════════════════════════════════
+
+    function defaultState() {
+      return {
+        owned: false,
+        stars: 1,
+        skills: [1, 1, 1, 1],
+        gear: GEAR_SLOTS.map(() => ({ quality: "none", stars: 0 })),
+        sigStars: 0,
+      };
+    }
+
+    function calcPower(heroId, st) {
+      if (!st || !st.owned) return 0;
+      const h = HEROES.find(x => x.id === heroId);
+      if (!h) return 0;
+      const base = RARITY[h.rarity].base * TIER[h.tier].mult * (1 + (st.stars - 1) * 0.4);
+      const skills = (st.skills || []).reduce((s, l) => s + (l - 1) * 30, 0);
+      const gear = (st.gear || []).reduce((s, g) => {
+        const q = GEAR_QUALITY.find(x => x.id === g.quality) || GEAR_QUALITY[0];
+        return s + q.power + (g.stars || 0) * 130;
+      }, 0);
+      const sig = h.rarity === "SSR" && st.sigStars > 0 ? 900 + (st.sigStars - 1) * 450 : 0;
+      return Math.round(base + skills + gear + sig);
+    }
+
+    function getSynergy(team) {
+      const counts = {};
+      team.filter(Boolean).forEach(id => {
+        const h = HEROES.find(x => x.id === id);
+        if (h) counts[h.cls] = (counts[h.cls] || 0) + 1;
+      });
+      let best = { cls: null, n: 0 };
+      Object.entries(counts).forEach(([cls, n]) => { if (n > best.n) best = { cls, n }; });
+      return { ...best, bonus: CLASS_SYNERGY[best.n] || null, counts };
+    }
+
+    // ═══════════════════════════════════════════════════
+    // COMPONENTS
+    // ═══════════════════════════════════════════════════
+
+    function RBadge({ rarity }) {
+      const r = RARITY[rarity];
+      return (
+        <span style={{
+          fontSize: 11, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+          color: r.color, border: `1px solid ${r.color}55`, background: r.bg
+        }}>{r.label}</span>
+      );
+    }
+
+    function TBadge({ tier }) {
+      const t = TIER[tier];
+      return (
+        <span style={{
+          fontSize: 11, fontWeight: 900, width: 20, height: 20, borderRadius: 4,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, color: t.color, background: t.color + "22"
+        }}>{tier}</span>
+      );
+    }
+
+    function GearRow({ slot, cfg, onChange }) {
+      const q = GEAR_QUALITY.find(x => x.id === slot.quality) || GEAR_QUALITY[0];
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0",
+          borderBottom: "1px solid #1f2937" }}>
+          <span style={{ width: 20, textAlign: "center", fontSize: 14 }}>{cfg.emoji}</span>
+          <span style={{ fontSize: 11, color: "#9ca3af", width: 56, flexShrink: 0 }}>{cfg.label}</span>
+          <select
+            value={slot.quality}
+            onChange={e => onChange({ ...slot, quality: e.target.value, stars: e.target.value === "none" ? 0 : slot.stars })}
+            style={{
+              flex: 1, background: "#1f2937", border: "1px solid #374151", borderRadius: 4,
+              padding: "2px 6px", fontSize: 11, color: q.color, outline: "none"
+            }}
+          >
+            {GEAR_QUALITY.map(gq => (
+              <option key={gq.id} value={gq.id}>{gq.label}</option>
+            ))}
+          </select>
+          {slot.quality !== "none" && (
+            <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <button key={i}
+                  onClick={() => onChange({ ...slot, stars: i + 1 === slot.stars ? 0 : i + 1 })}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    fontSize: 16, lineHeight: 1, padding: 0,
+                    color: i < slot.stars ? q.color : "#374151"
+                  }}>★</button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function HeroConfigPanel({ heroId, state, onChange }) {
+      const hero = HEROES.find(h => h.id === heroId);
+      if (!hero) return null;
+      const rc = RARITY[hero.rarity];
+      const power = calcPower(heroId, state);
+
+      return (
+        <div style={{ background: "#111827", borderRadius: 8, border: "1px solid #374151", overflow: "hidden" }}>
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 16px", borderBottom: "1px solid #374151",
+            borderLeft: `3px solid ${rc.color}`
+          }}>
+            <span style={{ fontSize: 28 }}>{hero.emoji}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{hero.name}</span>
+                <RBadge rarity={hero.rarity} />
+                <TBadge tier={hero.tier} />
+              </div>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, overflow: "hidden",
+                textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hero.role}</div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#fbbf24" }}>{power.toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>сила</div>
+            </div>
+          </div>
+
+          {!state.owned ? (
+            <div style={{ padding: 16 }}>
+              <button onClick={() => onChange({ ...state, owned: true })}
+                style={{
+                  width: "100%", padding: "8px 0", borderRadius: 8,
+                  border: "1px dashed #4b5563", background: "none",
+                  color: "#9ca3af", fontSize: 13, cursor: "pointer"
+                }}
+                onMouseOver={e => { e.target.style.borderColor = "#f59e0b"; e.target.style.color = "#f59e0b"; }}
+                onMouseOut={e => { e.target.style.borderColor = "#4b5563"; e.target.style.color = "#9ca3af"; }}
+              >
+                ✓ Отметить как имеющегося
+              </button>
+            </div>
+          ) : (
+            <div style={{ padding: 16, overflowY: "auto", maxHeight: 520 }}>
+
+              {/* Stars */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Звёзды героя
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#fbbf24" }}>{state.stars}★</span>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <button key={i} onClick={() => onChange({ ...state, stars: i + 1 })}
+                      style={{
+                        flex: 1, padding: "6px 0", borderRadius: 6, border: "none",
+                        fontSize: 11, fontWeight: 700, cursor: "pointer",
+                        background: i < state.stars ? rc.color : "#1f2937",
+                        color: i < state.stars ? "#000" : "#4b5563",
+                      }}>
+                      {i + 1}★
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Skills */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase",
+                  letterSpacing: "0.05em", marginBottom: 8 }}>
+                  Навыки (уровень 1–30)
+                </div>
+                {SKILL_LABELS.map((name, idx) => {
+                  const lv = state.skills[idx] || 1;
+                  return (
+                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, color: "#6b7280", width: 72, flexShrink: 0 }}>{name}</span>
+                      <input type="range" min="1" max="30" value={lv}
+                        onChange={e => {
+                          const sk = [...state.skills];
+                          sk[idx] = Number(e.target.value);
+                          onChange({ ...state, skills: sk });
+                        }}
+                        style={{ flex: 1, accentColor: rc.color }} />
+                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700,
+                        width: 24, textAlign: "right", color: rc.color }}>{lv}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Gear */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase",
+                  letterSpacing: "0.05em", marginBottom: 6 }}>Снаряжение</div>
+                <div style={{ background: "#1f2937", borderRadius: 8, padding: "4px 12px" }}>
+                  {GEAR_SLOTS.map((cfg, idx) => (
+                    <GearRow key={cfg.id}
+                      slot={state.gear[idx] || { quality: "none", stars: 0 }}
+                      cfg={cfg}
+                      onChange={newSlot => {
+                        const gear = [...state.gear];
+                        gear[idx] = newSlot;
+                        onChange({ ...state, gear });
+                      }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Signature weapon (SSR only) */}
+              {hero.rarity === "SSR" && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      Сигнатурное оружие
+                    </span>
+                    <span style={{ fontSize: 11, color: "#fb923c" }}>{state.sigStars > 0 ? `${state.sigStars}★` : "Нет"}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => onChange({ ...state, sigStars: 0 })}
+                      style={{
+                        padding: "4px 8px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                        background: state.sigStars === 0 ? "#4b5563" : "#1f2937",
+                        color: state.sigStars === 0 ? "#fff" : "#6b7280",
+                      }}>Нет</button>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <button key={i} onClick={() => onChange({ ...state, sigStars: i + 1 })}
+                        style={{
+                          flex: 1, padding: "4px 0", borderRadius: 6, border: "none", cursor: "pointer",
+                          fontSize: 11, fontWeight: 700,
+                          background: state.sigStars >= i + 1 ? "#f59e0b" : "#1f2937",
+                          color: state.sigStars >= i + 1 ? "#000" : "#4b5563",
+                        }}>
+                        {i + 1}★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button onClick={() => onChange({ ...state, owned: false })}
+                style={{ background: "none", border: "none", cursor: "pointer",
+                  fontSize: 11, color: "#4b5563", padding: 0 }}
+                onMouseOver={e => e.target.style.color = "#ef4444"}
+                onMouseOut={e => e.target.style.color = "#4b5563"}
+              >
+                Убрать из коллекции
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════
+    // MAIN APP
+    // ═══════════════════════════════════════════════════
+
+    function App() {
+      const [states, setStates] = useState(
+        Object.fromEntries(HEROES.map(h => [h.id, defaultState()]))
+      );
+      const [team, setTeam] = useState(Array(5).fill(null));
+      const [selSlot, setSelSlot] = useState(null);
+      const [cfgId, setCfgId] = useState(null);
+      const [fltCls, setFltCls] = useState("all");
+      const [fltRar, setFltRar] = useState("all");
+      const [fltOwned, setFltOwned] = useState(false);
+
+      const powers = useMemo(() => team.map(id => id ? calcPower(id, states[id]) : 0), [team, states]);
+      const total = powers.reduce((s, p) => s + p, 0);
+      const maxPow = useMemo(() => Math.max(...HEROES.map(h => calcPower(h.id, states[h.id])), 1), [states]);
+      const synergy = useMemo(() => getSynergy(team), [team]);
+      const inTeamSet = useMemo(() => new Set(team.filter(Boolean)), [team]);
+
+      const filtered = useMemo(() => HEROES.filter(h => {
+        if (fltCls !== "all" && h.cls !== fltCls) return false;
+        if (fltRar !== "all" && h.rarity !== fltRar) return false;
+        if (fltOwned && !states[h.id]?.owned) return false;
+        return true;
+      }), [fltCls, fltRar, fltOwned, states]);
+
+      function upd(id, fn) { setStates(p => ({ ...p, [id]: fn(p[id]) })); }
+
+      function assignToSlot(heroId) {
+        const slot = selSlot !== null ? selSlot : team.findIndex(x => !x);
+        if (slot === -1) return;
+        setTeam(p => { const t = [...p]; t[slot] = heroId; return t; });
+        setSelSlot(null);
+      }
+
+      function swapSuggestions(slotIdx) {
+        const curId = team[slotIdx];
+        return HEROES
+          .filter(h => states[h.id]?.owned && !inTeamSet.has(h.id) && h.id !== curId)
+          .map(h => ({ h, p: calcPower(h.id, states[h.id]) }))
+          .sort((a, b) => b.p - a.p)
+          .slice(0, 6);
+      }
+
+      const suggestions = selSlot !== null ? swapSuggestions(selSlot) : [];
+
+      return (
+        <div style={{ minHeight: "100vh", background: "#030712", color: "#f3f4f6", fontFamily: "system-ui, sans-serif" }}>
+
+          {/* ── TOP BAR ── */}
+          <div style={{ background: "#111827", borderBottom: "1px solid #f59e0b33", padding: "10px 16px" }}>
+            <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#fbbf24", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  ⚡ TILES SURVIVE — Team Builder
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                  Выбери героев · настрой · сравни силу
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 26, fontWeight: 900, color: "#fbbf24", lineHeight: 1 }}>{total.toLocaleString()}</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Общая сила</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ maxWidth: 1280, margin: "0 auto", padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+
+            {/* ── TEAM ── */}
+            <div style={{ background: "#111827", borderRadius: 8, border: "1px solid #374151", padding: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Команда · 5 героев
+                </span>
+                {synergy.bonus && (
+                  <span style={{
+                    fontSize: 11, padding: "2px 10px", borderRadius: 999, fontWeight: 700,
+                    background: (CLASS[synergy.cls]?.color || "#aaa") + "33",
+                    color: CLASS[synergy.cls]?.color
+                  }}>
+                    {synergy.n}× {CLASS[synergy.cls]?.label} {CLASS[synergy.cls]?.icon} → {synergy.bonus}
+                  </span>
+                )}
+                {total > 0 && (
+                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#4b5563" }}>
+                    Нажми на слот → смотри замены
+                  </span>
+                )}
+              </div>
+
+              {/* 5 slots */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+                {Array.from({ length: 5 }, (_, si) => {
+                  const id = team[si];
+                  const hero = id ? HEROES.find(h => h.id === id) : null;
+                  const pow = powers[si];
+                  const isSel = selSlot === si;
+                  const cls = hero ? CLASS[hero.cls] : null;
+
+                  return (
+                    <div key={si}
+                      onClick={() => { setSelSlot(isSel ? null : si); if (hero) setCfgId(hero.id); }}
+                      style={{
+                        borderRadius: 8,
+                        border: `2px solid ${isSel ? "#f59e0b" : hero ? cls.color + "66" : "#1f2937"}`,
+                        background: isSel ? "#78350f22" : hero ? "#0d1117" : "#030712",
+                        padding: 8, cursor: "pointer", textAlign: "center",
+                        transition: "border-color 0.15s"
+                      }}>
+                      {hero ? (
+                        <>
+                          <div style={{ fontSize: 26, marginBottom: 2 }}>{hero.emoji}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: cls.color, lineHeight: 1.2 }}>{hero.name}</div>
+                          <div style={{ fontSize: 10, color: "#6b7280" }}>{RARITY[hero.rarity].label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 900, color: "#fbbf24", marginTop: 4 }}>{pow.toLocaleString()}</div>
+                          <div style={{ height: 4, background: "#1f2937", borderRadius: 999, marginTop: 4, overflow: "hidden" }}>
+                            <div style={{ height: "100%", borderRadius: 999, background: cls.color,
+                              width: `${(pow / maxPow) * 100}%`, transition: "width 0.4s" }} />
+                          </div>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setTeam(p => { const t = [...p]; t[si] = null; return t; });
+                              if (selSlot === si) setSelSlot(null);
+                            }}
+                            style={{ marginTop: 4, background: "none", border: "none", cursor: "pointer",
+                              fontSize: 10, color: "#4b5563" }}
+                            onMouseOver={e => e.target.style.color = "#ef4444"}
+                            onMouseOut={e => e.target.style.color = "#4b5563"}
+                          >✕ убрать</button>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 22, color: "#374151", marginBottom: 4 }}>+</div>
+                          <div style={{ fontSize: 11, color: "#4b5563" }}>{isSel ? "↖ выбери" : `Слот ${si + 1}`}</div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Power breakdown */}
+              {total > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1f2937",
+                  display: "flex", alignItems: "flex-end", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    {team.map((id, i) => {
+                      if (!id) return null;
+                      const h = HEROES.find(x => x.id === id);
+                      const cls = CLASS[h.cls];
+                      const pct = (powers[i] / total) * 100;
+                      return (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 56, textAlign: "right", fontSize: 11, color: cls.color,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</div>
+                          <div style={{ flex: 1, height: 8, background: "#1f2937", borderRadius: 999, overflow: "hidden" }}>
+                            <div style={{ height: "100%", borderRadius: 999, background: cls.color, width: `${pct}%` }} />
+                          </div>
+                          <div style={{ width: 60, textAlign: "right", fontSize: 11, fontFamily: "monospace",
+                            color: "#d1d5db" }}>{powers[i].toLocaleString()}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>Сумма</div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: "#fbbf24" }}>{total.toLocaleString()}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── BOTTOM: Roster + Config ── */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+
+              {/* ── ROSTER ── */}
+              <div style={{ background: "#111827", borderRadius: 8, border: "1px solid #374151",
+                overflow: "hidden", display: "flex", flexDirection: "column" }}>
+
+                {/* Filters */}
+                <div style={{ padding: 12, borderBottom: "1px solid #1f2937",
+                  display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <select value={fltCls} onChange={e => setFltCls(e.target.value)}
+                    style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 4,
+                      padding: "4px 8px", fontSize: 11, color: "#e5e7eb", outline: "none" }}>
+                    <option value="all">Все классы</option>
+                    {Object.entries(CLASS).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+
+                  <select value={fltRar} onChange={e => setFltRar(e.target.value)}
+                    style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 4,
+                      padding: "4px 8px", fontSize: 11, color: "#e5e7eb", outline: "none" }}>
+                    <option value="all">Все редкости</option>
+                    <option value="SSR">SSR</option>
+                    <option value="SR">SR</option>
+                    <option value="R">R</option>
+                  </select>
+
+                  <button onClick={() => setFltOwned(!fltOwned)}
+                    style={{
+                      padding: "4px 10px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                      background: fltOwned ? "#f59e0b" : "#1f2937",
+                      color: fltOwned ? "#000" : "#9ca3af",
+                    }}>👤 Только мои</button>
+
+                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#4b5563" }}>
+                    {HEROES.filter(h => states[h.id]?.owned).length} / {HEROES.length}
+                  </span>
+                </div>
+
+                {/* Hero list */}
+                <div style={{ overflowY: "auto", flex: 1, maxHeight: 560 }}>
+                  {filtered.map(hero => {
+                    const st = states[hero.id];
+                    const pow = calcPower(hero.id, st);
+                    const cls = CLASS[hero.cls];
+                    const rar = RARITY[hero.rarity];
+                    const inTeam = inTeamSet.has(hero.id);
+                    const isCfg = cfgId === hero.id;
+
+                    return (
+                      <div key={hero.id}
+                        onClick={() => setCfgId(hero.id)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "10px 12px", borderBottom: "1px solid #1f2937",
+                          cursor: "pointer",
+                          background: isCfg ? "#f59e0b0d" : "transparent",
+                        }}
+                        onMouseOver={e => { if (!isCfg) e.currentTarget.style.background = "#1f2937aa"; }}
+                        onMouseOut={e => { e.currentTarget.style.background = isCfg ? "#f59e0b0d" : "transparent"; }}
+                      >
+                        {/* Owned checkbox */}
+                        <button
+                          onClick={e => { e.stopPropagation(); upd(hero.id, s => ({ ...s, owned: !s.owned })); }}
+                          style={{
+                            width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+                            border: `2px solid ${st.owned ? rar.color : "#374151"}`,
+                            background: st.owned ? rar.color : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            cursor: "pointer",
+                          }}>
+                          {st.owned && <span style={{ color: "#000", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                        </button>
+
+                        <span style={{ fontSize: 22, flexShrink: 0 }}>{hero.emoji}</span>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontWeight: 700, fontSize: 13 }}>{hero.name}</span>
+                            <TBadge tier={hero.tier} />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                            <RBadge rarity={hero.rarity} />
+                            <span style={{ fontSize: 11, color: cls.color }}>{cls.icon} {cls.label}</span>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: "right", flexShrink: 0, marginRight: 4 }}>
+                          {st.owned ? (
+                            <>
+                              <div style={{ fontSize: 11, color: "#fbbf24" }}>{"★".repeat(st.stars)}</div>
+                              <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, color: "#e5e7eb" }}>
+                                {pow.toLocaleString()}
+                              </div>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: 11, color: "#4b5563" }}>нет</span>
+                          )}
+                        </div>
+
+                        {st.owned && !inTeam && (
+                          <button
+                            onClick={e => { e.stopPropagation(); assignToSlot(hero.id); }}
+                            style={{
+                              flexShrink: 0, width: 28, height: 28, borderRadius: 6, border: "none",
+                              fontWeight: 700, fontSize: 16, background: "#f59e0b",
+                              color: "#000", cursor: "pointer",
+                            }}
+                            onMouseOver={e => e.target.style.background = "#fbbf24"}
+                            onMouseOut={e => e.target.style.background = "#f59e0b"}
+                          >+</button>
+                        )}
+                        {inTeam && (
+                          <span style={{
+                            flexShrink: 0, width: 28, height: 28, borderRadius: 6,
+                            background: "#1f2937", color: "#4ade80", fontSize: 11,
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                          }}>✓</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <div style={{ padding: 32, textAlign: "center", color: "#4b5563", fontSize: 13 }}>
+                      Нет героев по фильтру
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── RIGHT PANEL ── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+                {/* Swap suggestions */}
+                {selSlot !== null && suggestions.length > 0 && (
+                  <div style={{ background: "#111827", borderRadius: 8, border: "1px solid #f59e0b44", padding: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#fbbf24", textTransform: "uppercase",
+                      letterSpacing: "0.05em", marginBottom: 10 }}>
+                      💡 Замены для слота {selSlot + 1} · по убыванию силы
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {suggestions.map(({ h, p }) => {
+                        const cls = CLASS[h.cls];
+                        const curPow = powers[selSlot];
+                        const diff = p - curPow;
+                        return (
+                          <div key={h.id}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              padding: 8, borderRadius: 8, cursor: "pointer",
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = "#1f2937"}
+                            onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                            onClick={() => {
+                              setTeam(prev => { const t = [...prev]; t[selSlot] = h.id; return t; });
+                              setCfgId(h.id);
+                              setSelSlot(null);
+                            }}>
+                            <span style={{ fontSize: 20 }}>{h.emoji}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontWeight: 700, fontSize: 13 }}>{h.name}</span>
+                                <RBadge rarity={h.rarity} />
+                              </div>
+                              <div style={{ fontSize: 11, color: cls.color }}>{cls.icon} {cls.label}</div>
+                            </div>
+                            <div style={{ textAlign: "right", flexShrink: 0 }}>
+                              <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, color: "#e5e7eb" }}>
+                                {p.toLocaleString()}
+                              </div>
+                              {curPow > 0 && (
+                                <div style={{ fontSize: 11, fontWeight: 700,
+                                  color: diff > 0 ? "#4ade80" : diff < 0 ? "#f87171" : "#6b7280" }}>
+                                  {diff > 0 ? "+" : ""}{diff.toLocaleString()}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: 6, background: "#f59e0b",
+                              color: "#000", fontSize: 14, display: "flex", alignItems: "center",
+                              justifyContent: "center", fontWeight: 700, flexShrink: 0,
+                            }}>↩</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {selSlot !== null && suggestions.length === 0 && (
+                  <div style={{ background: "#111827", borderRadius: 8, border: "1px solid #f59e0b44",
+                    padding: 16, textAlign: "center", fontSize: 13, color: "#6b7280" }}>
+                    Нет доступных замен — отметь героев как «имеющихся»
+                  </div>
+                )}
+
+                {/* Hero config */}
+                {cfgId ? (
+                  <HeroConfigPanel
+                    heroId={cfgId}
+                    state={states[cfgId]}
+                    onChange={ns => upd(cfgId, () => ns)}
+                  />
+                ) : (
+                  <div style={{
+                    background: "#111827", borderRadius: 8, border: "1px solid #374151",
+                    padding: 48, textAlign: "center", color: "#4b5563", flex: 1,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center"
+                  }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>⚙️</div>
+                    <div style={{ fontSize: 13 }}>
+                      Нажми на героя в списке<br />чтобы настроить звёзды, навыки и снаряжение
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── MOUNT ──
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
